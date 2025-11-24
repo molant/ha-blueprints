@@ -6,10 +6,10 @@ A collection of advanced Home Assistant blueprints with hierarchical configurati
 
 ### 📢 Contact Sensor Left Open - Hierarchical Notification
 
-An enhanced contact sensor notification blueprint that uses a three-tier configuration hierarchy to provide flexible, per-sensor alert thresholds and notification priorities.
+An enhanced contact sensor notification blueprint that uses a four-tier configuration hierarchy to provide flexible, per-sensor alert thresholds and notification priorities.
 
 **Key Features:**
-- 🎯 **Three-tier hierarchy**: Entity-specific → Area-level → Global defaults
+- 🎯 **Four-tier hierarchy**: Entity-specific → Area-level → Floor-level → Global defaults
 - 🚨 **Critical iOS notifications**: Bypass Do Not Disturb mode for important alerts
 - 🔄 **Auto-clear notifications**: Automatically dismiss when sensor closes
 - 🔁 **Repeat alerts**: Optional recurring notifications while sensor remains open
@@ -105,6 +105,7 @@ You can use these variables in your notification title and message:
 
 - `{{sensor_name}}` - Friendly name of the sensor
 - `{{area}}` - Area the sensor is located in
+- `{{floor}}` - Floor/level the sensor is located on
 - `{{delay_minutes}}` - The threshold delay that was applied
 - `{{time_open}}` - How long the sensor has been open (human-readable)
 
@@ -120,14 +121,22 @@ You can use these variables in your notification title and message:
 The blueprint checks configurations in this order:
 
 ```
-1. Entity-specific override
+1. Entity-specific override (highest priority)
    ↓ (if not found)
-2. Area-level override
+2. Area-level override (rooms like Kitchen, Bedroom)
    ↓ (if not found)
-3. Global default
+3. Floor-level override (levels like Upstairs, Downstairs)
    ↓ (if not found)
-4. Blueprint fallback
+4. Global default
+   ↓ (if not found)
+5. Blueprint fallback
 ```
+
+**Why this order?**
+- **Entity** overrides are most specific (individual sensor needs)
+- **Area** overrides apply to rooms/spaces (Kitchen needs different settings than Bedroom)
+- **Floor** overrides apply to entire levels (Upstairs bedrooms share similar needs)
+- **Global** is the fallback for everything else
 
 ### Example Scenarios
 
@@ -136,6 +145,7 @@ The blueprint checks configurations in this order:
 ```yaml
 # Entity: binary_sensor.fridge_door
 # Area: Kitchen
+# Floor: Downstairs
 
 entity_overrides:
   binary_sensor.fridge_door:
@@ -152,6 +162,7 @@ entity_overrides:
 ```yaml
 # Entity: binary_sensor.front_door
 # Area: "Front Door"
+# Floor: Downstairs
 
 area_overrides:
   "Front Door":
@@ -163,11 +174,29 @@ area_overrides:
 
 ---
 
-#### Scenario 3: Random Bedroom Window (Global Default)
+#### Scenario 3: Guest Bedroom Window (Floor-Level Override)
 
 ```yaml
-# Entity: binary_sensor.bedroom_window_3
-# Area: Bedroom (no area override defined)
+# Entity: binary_sensor.guest_bedroom_window
+# Area: "Guest Bedroom" (no area override defined)
+# Floor: Upstairs
+
+floor_overrides:
+  Upstairs:
+    delay_minutes: 12
+    critical: false
+```
+
+**Result**: Alert after **12 minutes** with **standard** notification (floor override applies)
+
+---
+
+#### Scenario 4: Random Sensor (Global Default)
+
+```yaml
+# Entity: binary_sensor.shed_door
+# Area: "Shed" (no area override defined)
+# Floor: not assigned to any floor
 
 global_defaults:
   delay_minutes: 10
@@ -242,20 +271,20 @@ Fridge and freezer get immediate critical alerts. Dishwasher is less urgent. Oth
 
 ---
 
-### Example 4: Climate Control Zones
+### Example 4: Floor-Based Climate Control
 
 ```yaml
 global_defaults:
   delay_minutes: 10
   critical: false
 
-area_overrides:
+floor_overrides:
   Upstairs:
     delay_minutes: 12
     critical: false
 
   Downstairs:
-    delay_minutes: 12
+    delay_minutes: 10
     critical: false
 
   Basement:
@@ -268,7 +297,50 @@ entity_overrides:
     critical: true  # Attic can heat up fast!
 ```
 
-Different delays for different floors, with special handling for the attic window.
+Different delays for different floors (levels). Upstairs bedrooms get 12 minutes, Basement gets 20 minutes. Attic window gets special handling. All other areas on each floor inherit that floor's settings.
+
+---
+
+### Example 5: Combined Floor and Area Hierarchy
+
+```yaml
+global_defaults:
+  delay_minutes: 10
+  critical: false
+
+floor_overrides:
+  Upstairs:
+    delay_minutes: 15  # Bedrooms - longer delays
+    critical: false
+
+  Downstairs:
+    delay_minutes: 10
+    critical: false
+
+area_overrides:
+  "Master Bedroom":
+    delay_minutes: 20  # Override floor setting for this room
+    critical: false
+
+  Kitchen:
+    delay_minutes: 8
+    critical: false
+
+  "Front Door":
+    delay_minutes: 5
+    critical: true
+
+entity_overrides:
+  binary_sensor.fridge_door:
+    delay_minutes: 2
+    critical: true
+```
+
+This shows the full hierarchy in action:
+- All Upstairs rooms default to 15 minutes (floor override)
+- Master Bedroom gets 20 minutes (area override beats floor)
+- Kitchen and Front Door have specific settings (area overrides)
+- Fridge door gets highest priority (entity override)
 
 ---
 
@@ -387,36 +459,62 @@ global_defaults:
   critical: false
 ```
 
-### 2. Use Area Overrides for Zones
-Group similar rooms/spaces with area overrides rather than creating many entity-specific overrides:
+### 2. Use Floor Overrides for Broad Categorization
+Set different defaults for different levels of your home:
+```yaml
+floor_overrides:
+  Upstairs:
+    delay_minutes: 15  # Bedrooms typically
+  Downstairs:
+    delay_minutes: 10  # Main living areas
+  Basement:
+    delay_minutes: 20  # Less frequently used
+```
+
+### 3. Use Area Overrides for Specific Rooms
+Override floor settings for rooms with special requirements:
 ```yaml
 area_overrides:
   Kitchen:
-    delay_minutes: 10
-  Bedroom:
-    delay_minutes: 15
+    delay_minutes: 8
+  "Master Bedroom":
+    delay_minutes: 20  # Overrides the Upstairs floor default
+  "Front Door":
+    delay_minutes: 5
+    critical: true
 ```
 
-### 3. Reserve Entity Overrides for Special Cases
+### 4. Reserve Entity Overrides for Special Cases
 Only use entity-specific overrides for sensors with unique requirements:
 - Appliances (fridge, freezer)
 - High-security items (safe, medicine cabinet)
 - Sensors with unusual behavior
 
-### 4. Critical Notifications
+### 5. Understand the Hierarchy Benefits
+Instead of setting 5 bedrooms individually, use:
+```yaml
+floor_overrides:
+  Upstairs: 15 minutes  # All bedrooms inherit this
+
+area_overrides:
+  "Master Bedroom": 20 minutes  # Exception for one room
+```
+
+### 6. Critical Notifications
 Use critical notifications sparingly. They bypass Do Not Disturb and can be disruptive:
 - Entry points (when away)
 - Security sensors
 - Safety-critical appliances
 
-### 5. Test Your Configuration
+### 7. Test Your Configuration
 After making changes:
 1. Leave a sensor open and verify the timing
 2. Check that notifications appear correctly
 3. Confirm critical notifications work as expected
 4. Test that notifications clear when sensor closes
+5. Use Home Assistant's Developer Tools → Template to verify which floor/area a sensor belongs to
 
-### 6. Document Your Choices
+### 8. Document Your Choices
 Add comments in your configuration explaining why you chose specific values:
 ```yaml
 entity_overrides:
@@ -425,11 +523,11 @@ entity_overrides:
     critical: true
 ```
 
-### 7. Review and Adjust
+### 9. Review and Adjust
 Periodically review your configuration:
 - Are the delays appropriate?
 - Are you getting too many/too few notifications?
-- Can any entity-specific overrides be consolidated to area overrides?
+- Can any entity-specific overrides be consolidated to area or floor overrides?
 
 ---
 
@@ -446,7 +544,9 @@ Periodically review your configuration:
 
 1. **Check entity ID**: Ensure the entity ID in your config matches exactly (case-sensitive)
 2. **Check area name**: Verify the area name matches exactly (case-sensitive)
-3. **Review hierarchy**: Remember: entity → area → global → fallback
+3. **Check floor name**: Verify the floor name matches exactly (case-sensitive)
+4. **Review hierarchy**: Remember: entity → area → floor → global → fallback
+5. **Verify floor assignment**: Use Developer Tools → Template to check what floor Home Assistant has assigned to the sensor's area
 
 ### Config Helper Not Parsing
 
@@ -508,12 +608,12 @@ For issues or questions:
 ## Changelog
 
 ### v1.0.0 (Initial Release)
-- Three-tier hierarchical configuration system
-- Entity, area, and global override support
+- Four-tier hierarchical configuration system
+- Entity, area, floor, and global override support
 - Critical iOS notifications
 - Auto-clear on sensor close
 - Repeat notifications
 - Binary sensor group support
-- Customizable messages with variables
+- Customizable messages with variables (including floor)
 - Additional conditions support
 - Custom actions on open/close events

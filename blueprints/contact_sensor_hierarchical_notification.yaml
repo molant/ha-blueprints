@@ -3,13 +3,14 @@ blueprint:
   description: >
     Enhanced contact sensor notification with hierarchical configuration system.
 
-    This blueprint supports a three-tier configuration hierarchy:
+    This blueprint supports a four-tier configuration hierarchy:
     1. Entity-specific overrides (highest priority)
-    2. Area-level defaults (middle priority)
-    3. Global defaults (fallback)
+    2. Area-level overrides (rooms like Kitchen, Bedroom)
+    3. Floor-level overrides (levels like Upstairs, Downstairs)
+    4. Global defaults (fallback)
 
     Features:
-    - Customizable delay thresholds per entity, area, or globally
+    - Customizable delay thresholds per entity, area, floor, or globally
     - Standard or critical iOS notifications (bypasses Do Not Disturb)
     - Auto-clear notifications when sensor closes
     - Optional repeat notifications
@@ -34,7 +35,7 @@ blueprint:
       name: Configuration Helper (Input Text)
       description: >
         An input_text helper containing your hierarchical configuration in YAML format.
-        This defines global defaults, area overrides, and entity-specific settings.
+        This defines global defaults, floor overrides, area overrides, and entity-specific settings.
         See the example configuration file for the expected format.
       selector:
         entity:
@@ -68,14 +69,14 @@ blueprint:
 
     notification_title:
       name: Notification Title
-      description: "Variables: {{sensor_name}}, {{area}}, {{delay_minutes}}"
+      description: "Variables: {{sensor_name}}, {{area}}, {{floor}}, {{delay_minutes}}"
       default: "{{sensor_name}} Left Open"
       selector:
         text:
 
     notification_message:
       name: Notification Message
-      description: "Variables: {{sensor_name}}, {{area}}, {{delay_minutes}}, {{time_open}}"
+      description: "Variables: {{sensor_name}}, {{area}}, {{floor}}, {{delay_minutes}}, {{time_open}}"
       default: "{{sensor_name}} has been open for {{delay_minutes}} minutes"
       selector:
         text:
@@ -143,11 +144,25 @@ variables:
   sensor_area: "{{ area_name(contact_sensor) | default('Unknown', true) }}"
   sensor_entity_id: "{{ contact_sensor }}"
 
+  # Get the floor for this sensor (from area assignment in Home Assistant)
+  # Falls back to 'Unknown' if no floor is assigned to the area
+  sensor_floor: >
+    {% set area_id_val = area_id(contact_sensor) %}
+    {% if area_id_val %}
+      {{ area_floor(area_id_val) | default('Unknown', true) }}
+    {% else %}
+      Unknown
+    {% endif %}
+
   # Parse the configuration from the helper
   # The config helper should contain YAML in this format:
   # global_defaults:
   #   delay_minutes: 10
   #   critical: false
+  # floor_overrides:
+  #   Upstairs:
+  #     delay_minutes: 12
+  #     critical: false
   # area_overrides:
   #   Kitchen:
   #     delay_minutes: 5
@@ -171,19 +186,26 @@ variables:
 
   # Extract configuration sections
   global_config: "{{ parsed_config.get('global_defaults', {}) }}"
+  floor_overrides: "{{ parsed_config.get('floor_overrides', {}) }}"
   area_overrides: "{{ parsed_config.get('area_overrides', {}) }}"
   entity_overrides: "{{ parsed_config.get('entity_overrides', {}) }}"
 
-  # Determine delay_minutes using hierarchy: entity → area → global → fallback
+  # Determine delay_minutes using hierarchy: entity → area → floor → global → fallback
   delay_minutes: >
     {% if sensor_entity_id in entity_overrides %}
-      {# Entity-specific override found #}
+      {# Entity-specific override found (highest priority) #}
       {{ entity_overrides[sensor_entity_id].get('delay_minutes',
          area_overrides.get(sensor_area, {}).get('delay_minutes',
-         global_config.get('delay_minutes', fallback_delay_input))) }}
+         floor_overrides.get(sensor_floor, {}).get('delay_minutes',
+         global_config.get('delay_minutes', fallback_delay_input)))) }}
     {% elif sensor_area in area_overrides %}
-      {# Area-level override found #}
+      {# Area-level override found (2nd priority) #}
       {{ area_overrides[sensor_area].get('delay_minutes',
+         floor_overrides.get(sensor_floor, {}).get('delay_minutes',
+         global_config.get('delay_minutes', fallback_delay_input))) }}
+    {% elif sensor_floor in floor_overrides %}
+      {# Floor-level override found (3rd priority) #}
+      {{ floor_overrides[sensor_floor].get('delay_minutes',
          global_config.get('delay_minutes', fallback_delay_input)) }}
     {% elif 'delay_minutes' in global_config %}
       {# Use global default #}
@@ -196,15 +218,25 @@ variables:
   # Determine critical notification using same hierarchy
   is_critical: >
     {% if sensor_entity_id in entity_overrides %}
+      {# Entity-specific override found (highest priority) #}
       {{ entity_overrides[sensor_entity_id].get('critical',
          area_overrides.get(sensor_area, {}).get('critical',
-         global_config.get('critical', fallback_critical_input))) }}
+         floor_overrides.get(sensor_floor, {}).get('critical',
+         global_config.get('critical', fallback_critical_input)))) }}
     {% elif sensor_area in area_overrides %}
+      {# Area-level override found (2nd priority) #}
       {{ area_overrides[sensor_area].get('critical',
+         floor_overrides.get(sensor_floor, {}).get('critical',
+         global_config.get('critical', fallback_critical_input))) }}
+    {% elif sensor_floor in floor_overrides %}
+      {# Floor-level override found (3rd priority) #}
+      {{ floor_overrides[sensor_floor].get('critical',
          global_config.get('critical', fallback_critical_input)) }}
     {% elif 'critical' in global_config %}
+      {# Use global default #}
       {{ global_config.critical }}
     {% else %}
+      {# Use fallback #}
       {{ fallback_critical_input }}
     {% endif %}
 

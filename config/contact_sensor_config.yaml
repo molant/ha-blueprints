@@ -2,24 +2,31 @@
 # Contact Sensor Hierarchical Configuration
 # ============================================================================
 #
-# This configuration file defines a three-tier hierarchy for contact sensor
+# This configuration file defines a four-tier hierarchy for contact sensor
 # notifications:
 #
 # 1. ENTITY-SPECIFIC OVERRIDES (Highest Priority)
 #    - Apply to individual sensors
-#    - Override both area and global settings
+#    - Override area, floor, and global settings
 #
-# 2. AREA-LEVEL OVERRIDES (Medium Priority)
-#    - Apply to all sensors in a specific area
-#    - Override global settings
+# 2. AREA-LEVEL OVERRIDES (2nd Priority)
+#    - Apply to all sensors in a specific area/room
+#    - Examples: Kitchen, Bedroom, "Front Door"
+#    - Override floor and global settings
 #    - Overridden by entity-specific settings
 #
-# 3. GLOBAL DEFAULTS (Lowest Priority / Fallback)
+# 3. FLOOR-LEVEL OVERRIDES (3rd Priority)
+#    - Apply to all sensors on a specific floor/level
+#    - Examples: Upstairs, Downstairs, "Ground Floor"
+#    - Override global settings
+#    - Overridden by area and entity-specific settings
+#
+# 4. GLOBAL DEFAULTS (Lowest Priority / Fallback)
 #    - Apply to all sensors unless overridden
-#    - Used when no area or entity-specific config exists
+#    - Used when no floor, area, or entity-specific config exists
 #
 # HIERARCHY RESOLUTION ORDER:
-# Entity-specific → Area-level → Global → Blueprint fallback
+# Entity-specific → Area-level → Floor-level → Global → Blueprint fallback
 #
 # ============================================================================
 
@@ -28,7 +35,7 @@
 # GLOBAL DEFAULTS
 # ----------------------------------------------------------------------------
 # These settings apply to ALL contact sensors unless overridden by
-# area-level or entity-specific configurations.
+# floor-level, area-level, or entity-specific configurations.
 #
 # Properties:
 #   delay_minutes: How long the sensor must be open before alerting
@@ -41,23 +48,72 @@ global_defaults:
 
 
 # ----------------------------------------------------------------------------
+# FLOOR-LEVEL OVERRIDES
+# ----------------------------------------------------------------------------
+# Define different thresholds for entire floors/levels in your home.
+# Floor names must match exactly with your Home Assistant floor names
+# (case-sensitive).
+#
+# These provide a middle-ground between global defaults and specific areas.
+# Use this to set different defaults for different levels of your home.
+#
+# Example use cases:
+#   - Longer delays for upstairs bedrooms (sleeping area)
+#   - Shorter delays for ground floor (entry level, more security-sensitive)
+#   - Different settings for basement (less frequently used)
+#
+# The floor is determined by Home Assistant's floor assignment for the
+# area that contains each sensor entity.
+#
+# NOTE: Areas in the "area_overrides" section will take precedence over
+# floor settings, so you can have floor-wide defaults with room-specific
+# exceptions.
+# ----------------------------------------------------------------------------
+
+floor_overrides:
+  # Upper floors - Slightly longer delays (bedroom/sleeping areas)
+  Upstairs:
+    delay_minutes: 12
+    critical: false
+
+  # Main floor - Standard delays
+  Downstairs:
+    delay_minutes: 10
+    critical: false
+
+  # Ground floor - Could be more security-conscious
+  "Ground Floor":
+    delay_minutes: 8
+    critical: false
+
+  # Basement - Longer delays (less frequently accessed)
+  Basement:
+    delay_minutes: 20
+    critical: false
+
+
+# ----------------------------------------------------------------------------
 # AREA-LEVEL OVERRIDES
 # ----------------------------------------------------------------------------
-# Define different thresholds and notification types for specific areas
+# Define different thresholds and notification types for specific areas/rooms
 # in your home. Area names must match exactly with your Home Assistant
 # area names (case-sensitive).
+#
+# These take precedence over floor-level settings, allowing you to have
+# floor-wide defaults with room-specific exceptions.
 #
 # Example use cases:
 #   - Shorter delays for security-sensitive areas (entry points)
 #   - Longer delays for frequently accessed areas (garage)
 #   - Critical notifications for outdoor/external doors
+#   - Specific climate control needs per room
 #
 # The area name is determined by Home Assistant's area assignment for
 # each sensor entity.
 # ----------------------------------------------------------------------------
 
 area_overrides:
-  # Entry/Security Areas - Critical and quick alerts
+  # Entry/Security Areas - Critical and quick alerts (override floor defaults)
   "Front Door":
     delay_minutes: 5
     critical: true
@@ -71,7 +127,7 @@ area_overrides:
     delay_minutes: 10
     critical: false
 
-  Bedroom:
+  "Master Bedroom":
     delay_minutes: 15
     critical: false
 
@@ -84,30 +140,17 @@ area_overrides:
     delay_minutes: 30
     critical: false
 
-  Basement:
-    delay_minutes: 20
-    critical: false
-
   # Outdoor/External - Critical notifications
   Patio:
     delay_minutes: 10
     critical: true
 
-  # Climate-sensitive areas (future: could add temperature thresholds)
-  Upstairs:
-    delay_minutes: 12
-    critical: false
-
-  Downstairs:
-    delay_minutes: 12
-    critical: false
-
 
 # ----------------------------------------------------------------------------
 # ENTITY-SPECIFIC OVERRIDES
 # ----------------------------------------------------------------------------
-# Define custom settings for individual sensors. These override both
-# area-level and global defaults.
+# Define custom settings for individual sensors. These override area-level,
+# floor-level, and global defaults.
 #
 # Entity IDs must match exactly with your Home Assistant entity IDs.
 #
@@ -119,7 +162,7 @@ area_overrides:
 #   - Safe/valuables (immediate, critical)
 #
 # TIP: Use entity-specific overrides sparingly. Most sensors should
-# inherit from area or global defaults for easier maintenance.
+# inherit from area, floor, or global defaults for easier maintenance.
 # ----------------------------------------------------------------------------
 
 entity_overrides:
@@ -164,54 +207,77 @@ entity_overrides:
 # USAGE EXAMPLES
 # ============================================================================
 #
-# Example 1: Front door sensor
-# -----------------------------
+# Example 1: Front door sensor (Area override)
+# ---------------------------------------------
 # Entity: binary_sensor.front_door
 # Area: "Front Door"
+# Floor: Downstairs
 #
 # Resolution:
 # 1. Check entity_overrides → Not found
 # 2. Check area_overrides["Front Door"] → Found!
 #    → delay_minutes: 5, critical: true
+# 3. (Floor and global defaults are ignored due to area-specific match)
 #
 # Result: Alert after 5 minutes with critical notification
 #
 #
-# Example 2: Fridge door sensor
-# ------------------------------
+# Example 2: Fridge door sensor (Entity override)
+# ------------------------------------------------
 # Entity: binary_sensor.fridge_door
 # Area: Kitchen
+# Floor: Downstairs
 #
 # Resolution:
 # 1. Check entity_overrides[binary_sensor.fridge_door] → Found!
 #    → delay_minutes: 2, critical: true
-# 2. (Area and global defaults are ignored due to entity-specific match)
+# 2. (Area, floor, and global defaults are ignored due to entity-specific match)
 #
 # Result: Alert after 2 minutes with critical notification
 #
 #
-# Example 3: Random window in living room
-# ----------------------------------------
+# Example 3: Random window in living room (Area override)
+# --------------------------------------------------------
 # Entity: binary_sensor.living_room_window_2
 # Area: "Living Room"
+# Floor: Downstairs
 #
 # Resolution:
 # 1. Check entity_overrides → Not found
 # 2. Check area_overrides["Living Room"] → Found!
 #    → delay_minutes: 15, critical: false
+# 3. (Floor and global defaults are ignored due to area-specific match)
 #
 # Result: Alert after 15 minutes with standard notification
 #
 #
-# Example 4: Sensor in unspecified area
-# --------------------------------------
+# Example 4: Generic bedroom window (Floor override)
+# ---------------------------------------------------
+# Entity: binary_sensor.guest_bedroom_window
+# Area: "Guest Bedroom" (not in area_overrides)
+# Floor: Upstairs
+#
+# Resolution:
+# 1. Check entity_overrides → Not found
+# 2. Check area_overrides["Guest Bedroom"] → Not found
+# 3. Check floor_overrides["Upstairs"] → Found!
+#    → delay_minutes: 12, critical: false
+# 4. (Global default is ignored due to floor-specific match)
+#
+# Result: Alert after 12 minutes with standard notification
+#
+#
+# Example 5: Sensor in unspecified area/floor (Global default)
+# -------------------------------------------------------------
 # Entity: binary_sensor.random_sensor
 # Area: "Office" (not in area_overrides)
+# Floor: "Second Floor" (not in floor_overrides)
 #
 # Resolution:
 # 1. Check entity_overrides → Not found
 # 2. Check area_overrides["Office"] → Not found
-# 3. Check global_defaults → Found!
+# 3. Check floor_overrides["Second Floor"] → Not found
+# 4. Check global_defaults → Found!
 #    → delay_minutes: 10, critical: false
 #
 # Result: Alert after 10 minutes with standard notification
@@ -264,28 +330,41 @@ entity_overrides:
 #    - Most sensors should work well with the global config
 #    - Adjust the global defaults first before adding overrides
 #
-# 2. Use area overrides for logical groupings
-#    - Group similar rooms/spaces
-#    - Consider security zones (entry points, outdoor, etc.)
-#    - Think about climate control zones
+# 2. Use floor overrides for broad categorization
+#    - Set different defaults for different levels of your home
+#    - Upstairs vs Downstairs, Ground Floor vs Basement, etc.
+#    - Provides a good middle ground between global and area-specific
 #
-# 3. Reserve entity-specific overrides for special cases
+# 3. Use area overrides for specific rooms/spaces
+#    - Group similar rooms/spaces with special requirements
+#    - Consider security zones (entry points, outdoor, etc.)
+#    - Think about climate control needs per room
+#    - These override floor settings for specific rooms
+#
+# 4. Reserve entity-specific overrides for special cases
 #    - Appliances with specific requirements
-#    - High-security items
+#    - High-security items (safes, medicine cabinets)
 #    - Sensors with unusual behavior patterns
 #
-# 4. Document your reasoning
+# 5. Understand the hierarchy benefits
+#    - Floor overrides: Set "Upstairs" to 12 minutes for all bedrooms
+#    - Area override: Set "Master Bedroom" to 15 minutes as exception
+#    - This is cleaner than setting each bedroom individually
+#
+# 6. Document your reasoning
 #    - Add comments explaining why you chose specific values
 #    - Note any special circumstances
 #
-# 5. Test your configuration
+# 7. Test your configuration
 #    - After making changes, test a few sensors
 #    - Verify the hierarchy is working as expected
 #    - Check notification timing and criticality
+#    - Use Home Assistant's template developer tools to check which
+#      floor/area a sensor belongs to
 #
-# 6. Review periodically
+# 8. Review periodically
 #    - Adjust thresholds based on real-world usage
 #    - Remove overrides that are no longer needed
-#    - Update as you add new sensors or areas
+#    - Update as you add new sensors, areas, or floors
 #
 # ============================================================================
