@@ -1,0 +1,519 @@
+# Home Assistant Blueprints
+
+A collection of advanced Home Assistant blueprints with hierarchical configuration support.
+
+## Blueprints
+
+### 📢 Contact Sensor Left Open - Hierarchical Notification
+
+An enhanced contact sensor notification blueprint that uses a three-tier configuration hierarchy to provide flexible, per-sensor alert thresholds and notification priorities.
+
+**Key Features:**
+- 🎯 **Three-tier hierarchy**: Entity-specific → Area-level → Global defaults
+- 🚨 **Critical iOS notifications**: Bypass Do Not Disturb mode for important alerts
+- 🔄 **Auto-clear notifications**: Automatically dismiss when sensor closes
+- 🔁 **Repeat alerts**: Optional recurring notifications while sensor remains open
+- 👥 **Binary sensor group support**: Monitor multiple sensors as one
+- 🎨 **Customizable messages**: Use variables like sensor name, area, time open
+- ⚙️ **Additional conditions**: Only alert when home, during specific hours, etc.
+- 🎬 **Custom actions**: Trigger additional automations on open/close events
+
+---
+
+## Installation
+
+### Step 1: Import the Blueprint
+
+Click the badge below to import the blueprint into your Home Assistant instance:
+
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/YOUR_USERNAME/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml)
+
+Or manually import via:
+1. Navigate to **Settings** → **Automations & Scenes** → **Blueprints**
+2. Click **Import Blueprint**
+3. Enter the URL: `https://github.com/YOUR_USERNAME/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml`
+
+### Step 2: Create the Configuration Helper
+
+The blueprint uses an `input_text` helper to store your hierarchical configuration.
+
+1. Navigate to **Settings** → **Devices & Services** → **Helpers**
+2. Click **Create Helper** → **Text**
+3. Configure the helper:
+   - **Name**: `Contact Sensor Config`
+   - **Entity ID**: `input_text.contact_sensor_config` (or your preferred ID)
+   - **Max length**: 5000 (or higher, depending on config size)
+4. Click **Create**
+
+### Step 3: Add Your Configuration
+
+Copy the example configuration from [`config/contact_sensor_config.yaml`](config/contact_sensor_config.yaml) and paste it into your newly created helper:
+
+1. Go to **Developer Tools** → **States**
+2. Find your `input_text.contact_sensor_config` entity
+3. Click on it and paste the configuration content (everything from the example file)
+4. Click **Set State**
+
+**Alternative Method** (for advanced users):
+
+You can also manage the configuration in a separate YAML file using Home Assistant's `!include` directive:
+
+```yaml
+# configuration.yaml
+input_text:
+  contact_sensor_config:
+    name: Contact Sensor Config
+    max: 5000
+    initial: !include config/contact_sensor_config.yaml
+```
+
+### Step 4: Create Automation from Blueprint
+
+1. Navigate to **Settings** → **Automations & Scenes**
+2. Click **Create Automation** → **Use Blueprint**
+3. Select **Contact Sensor Left Open - Hierarchical Notification**
+4. Configure the automation (see Configuration section below)
+
+---
+
+## Configuration
+
+### Basic Setup
+
+When creating an automation from the blueprint, you'll need to configure:
+
+#### Required Settings:
+
+- **Contact Sensor**: The binary sensor or group to monitor
+- **Configuration Helper**: Select `input_text.contact_sensor_config` (or whatever you named it)
+- **Notification Service**: Your notification service (e.g., `notify.mobile_app_iphone`)
+
+#### Optional Settings:
+
+- **Fallback Delay**: Used if config parsing fails (default: 10 minutes)
+- **Fallback Critical**: Critical notification fallback (default: false)
+- **Notification Title**: Template for notification title
+- **Notification Message**: Template for notification message
+- **Repeat Notifications**: Enable recurring alerts
+- **Repeat Interval**: How often to repeat (if enabled)
+- **Additional Conditions**: Extra conditions that must be met
+- **Custom Actions**: Actions to run on open/close events
+
+### Template Variables
+
+You can use these variables in your notification title and message:
+
+- `{{sensor_name}}` - Friendly name of the sensor
+- `{{area}}` - Area the sensor is located in
+- `{{delay_minutes}}` - The threshold delay that was applied
+- `{{time_open}}` - How long the sensor has been open (human-readable)
+
+**Example Custom Message:**
+```
+⚠️ {{sensor_name}} in {{area}} has been open for {{time_open}}!
+```
+
+---
+
+## Understanding the Hierarchy
+
+The blueprint checks configurations in this order:
+
+```
+1. Entity-specific override
+   ↓ (if not found)
+2. Area-level override
+   ↓ (if not found)
+3. Global default
+   ↓ (if not found)
+4. Blueprint fallback
+```
+
+### Example Scenarios
+
+#### Scenario 1: Fridge Door (Entity-Specific Override)
+
+```yaml
+# Entity: binary_sensor.fridge_door
+# Area: Kitchen
+
+entity_overrides:
+  binary_sensor.fridge_door:
+    delay_minutes: 2
+    critical: true
+```
+
+**Result**: Alert after **2 minutes** with **critical** notification (entity override wins)
+
+---
+
+#### Scenario 2: Front Door (Area-Level Override)
+
+```yaml
+# Entity: binary_sensor.front_door
+# Area: "Front Door"
+
+area_overrides:
+  "Front Door":
+    delay_minutes: 5
+    critical: true
+```
+
+**Result**: Alert after **5 minutes** with **critical** notification (area override wins)
+
+---
+
+#### Scenario 3: Random Bedroom Window (Global Default)
+
+```yaml
+# Entity: binary_sensor.bedroom_window_3
+# Area: Bedroom (no area override defined)
+
+global_defaults:
+  delay_minutes: 10
+  critical: false
+```
+
+**Result**: Alert after **10 minutes** with **standard** notification (global default applies)
+
+---
+
+## Configuration Examples
+
+### Example 1: Minimal Configuration
+
+```yaml
+global_defaults:
+  delay_minutes: 10
+  critical: false
+```
+
+Simple setup where all sensors alert after 10 minutes with standard notifications.
+
+---
+
+### Example 2: Area-Based Security Zones
+
+```yaml
+global_defaults:
+  delay_minutes: 15
+  critical: false
+
+area_overrides:
+  "Front Door":
+    delay_minutes: 5
+    critical: true
+
+  "Back Door":
+    delay_minutes: 5
+    critical: true
+
+  Garage:
+    delay_minutes: 30
+    critical: false
+```
+
+Entry points get quick, critical alerts. Garage has a longer delay. All other sensors use the 15-minute default.
+
+---
+
+### Example 3: Appliance-Specific Alerts
+
+```yaml
+global_defaults:
+  delay_minutes: 10
+  critical: false
+
+entity_overrides:
+  binary_sensor.fridge_door:
+    delay_minutes: 2
+    critical: true
+
+  binary_sensor.freezer_door:
+    delay_minutes: 3
+    critical: true
+
+  binary_sensor.dishwasher_door:
+    delay_minutes: 30
+    critical: false
+```
+
+Fridge and freezer get immediate critical alerts. Dishwasher is less urgent. Other sensors use global defaults.
+
+---
+
+### Example 4: Climate Control Zones
+
+```yaml
+global_defaults:
+  delay_minutes: 10
+  critical: false
+
+area_overrides:
+  Upstairs:
+    delay_minutes: 12
+    critical: false
+
+  Downstairs:
+    delay_minutes: 12
+    critical: false
+
+  Basement:
+    delay_minutes: 20
+    critical: false
+
+entity_overrides:
+  binary_sensor.attic_window:
+    delay_minutes: 5
+    critical: true  # Attic can heat up fast!
+```
+
+Different delays for different floors, with special handling for the attic window.
+
+---
+
+## Using Binary Sensor Groups
+
+You can monitor multiple sensors as a single unit using binary sensor groups:
+
+### Step 1: Create a Binary Sensor Group
+
+```yaml
+# configuration.yaml
+binary_sensor:
+  - platform: group
+    name: "All Exterior Doors"
+    device_class: door
+    entities:
+      - binary_sensor.front_door
+      - binary_sensor.back_door
+      - binary_sensor.garage_door
+      - binary_sensor.side_door
+```
+
+### Step 2: Create Automation
+
+Create an automation using the blueprint and select `binary_sensor.all_exterior_doors` as the contact sensor.
+
+### Step 3: Configure the Group in Your Config
+
+```yaml
+entity_overrides:
+  binary_sensor.all_exterior_doors:
+    delay_minutes: 5
+    critical: true
+```
+
+**Result**: Any exterior door left open for 5 minutes triggers a critical notification. The notification clears when ALL doors are closed.
+
+---
+
+## Advanced Usage
+
+### Conditional Notifications
+
+Use **Additional Conditions** to only send alerts when specific conditions are met:
+
+**Example: Only alert when away from home**
+```yaml
+# In the automation, add this condition:
+condition:
+  - condition: not
+    conditions:
+      - condition: zone
+        entity_id: person.your_name
+        zone: zone.home
+```
+
+**Example: Only alert during nighttime**
+```yaml
+condition:
+  - condition: time
+    after: "22:00:00"
+    before: "06:00:00"
+```
+
+---
+
+### Custom Actions
+
+Use **Custom Actions** to trigger additional automations:
+
+**Example: Flash lights when door left open**
+```yaml
+# Custom Actions (On Open Alert):
+- service: light.turn_on
+  target:
+    entity_id: light.hallway
+  data:
+    flash: long
+
+# Custom Actions (On Close):
+- service: light.turn_off
+  target:
+    entity_id: light.hallway
+```
+
+**Example: Announce via TTS**
+```yaml
+# Custom Actions (On Open Alert):
+- service: tts.google_translate_say
+  target:
+    entity_id: media_player.living_room_speaker
+  data:
+    message: "Warning: {{sensor_name}} has been left open"
+```
+
+---
+
+### Repeat Notifications
+
+Enable **Repeat Notifications** to get recurring reminders:
+
+- **Enable Repeat Notifications**: ✓ On
+- **Repeat Interval**: 30 minutes
+
+The automation will send a new notification every 30 minutes while the sensor remains open. Each notification updates with the current time the sensor has been open.
+
+---
+
+## Tips and Best Practices
+
+### 1. Start Simple
+Begin with a basic global default and add overrides as needed:
+```yaml
+global_defaults:
+  delay_minutes: 10
+  critical: false
+```
+
+### 2. Use Area Overrides for Zones
+Group similar rooms/spaces with area overrides rather than creating many entity-specific overrides:
+```yaml
+area_overrides:
+  Kitchen:
+    delay_minutes: 10
+  Bedroom:
+    delay_minutes: 15
+```
+
+### 3. Reserve Entity Overrides for Special Cases
+Only use entity-specific overrides for sensors with unique requirements:
+- Appliances (fridge, freezer)
+- High-security items (safe, medicine cabinet)
+- Sensors with unusual behavior
+
+### 4. Critical Notifications
+Use critical notifications sparingly. They bypass Do Not Disturb and can be disruptive:
+- Entry points (when away)
+- Security sensors
+- Safety-critical appliances
+
+### 5. Test Your Configuration
+After making changes:
+1. Leave a sensor open and verify the timing
+2. Check that notifications appear correctly
+3. Confirm critical notifications work as expected
+4. Test that notifications clear when sensor closes
+
+### 6. Document Your Choices
+Add comments in your configuration explaining why you chose specific values:
+```yaml
+entity_overrides:
+  binary_sensor.fridge_door:
+    delay_minutes: 2  # Food safety - need quick alert
+    critical: true
+```
+
+### 7. Review and Adjust
+Periodically review your configuration:
+- Are the delays appropriate?
+- Are you getting too many/too few notifications?
+- Can any entity-specific overrides be consolidated to area overrides?
+
+---
+
+## Troubleshooting
+
+### Notifications Not Working
+
+1. **Check the config helper**: Make sure `input_text.contact_sensor_config` contains valid YAML
+2. **Verify notification service**: Test your notification service manually
+3. **Check automation trace**: View the automation trace in Home Assistant to see what's happening
+4. **Review conditions**: Make sure any additional conditions you added are being met
+
+### Wrong Delay or Notification Type
+
+1. **Check entity ID**: Ensure the entity ID in your config matches exactly (case-sensitive)
+2. **Check area name**: Verify the area name matches exactly (case-sensitive)
+3. **Review hierarchy**: Remember: entity → area → global → fallback
+
+### Config Helper Not Parsing
+
+1. **Validate YAML**: Use a YAML validator to check your config syntax
+2. **Check indentation**: YAML is sensitive to indentation (use spaces, not tabs)
+3. **Review length limit**: Make sure your config fits within the helper's max length
+4. **Check for special characters**: Some characters may need to be quoted
+
+### Critical Notifications Not Working (iOS)
+
+1. **Check iOS settings**: Ensure the Home Assistant app has critical notification permission
+2. **Verify notification data**: Check the automation trace to see if critical data is being sent
+3. **Test manually**: Send a test critical notification from Developer Tools
+
+---
+
+## Future Enhancements
+
+The configuration structure is designed to be extensible. Planned features include:
+
+- **Temperature-based thresholds**: Different delays based on indoor/outdoor temperature
+- **Time-based overrides**: Different settings for day vs night
+- **Presence-based adjustments**: More aggressive alerts when away
+- **Seasonal adjustments**: Longer delays for windows during pleasant weather
+
+The current architecture is ready to support these features when implemented.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+---
+
+## License
+
+MIT License - feel free to use and modify as needed.
+
+---
+
+## Credits
+
+Created for the Home Assistant community. Inspired by the need for flexible, per-sensor notification thresholds without creating dozens of individual automations.
+
+---
+
+## Support
+
+If you find this blueprint useful, please star the repository and share it with others!
+
+For issues or questions:
+- Open an issue on GitHub
+- Visit the Home Assistant Community Forum
+- Check the Home Assistant Blueprint Exchange
+
+---
+
+## Changelog
+
+### v1.0.0 (Initial Release)
+- Three-tier hierarchical configuration system
+- Entity, area, and global override support
+- Critical iOS notifications
+- Auto-clear on sensor close
+- Repeat notifications
+- Binary sensor group support
+- Customizable messages with variables
+- Additional conditions support
+- Custom actions on open/close events

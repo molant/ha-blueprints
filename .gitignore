@@ -1,0 +1,21 @@
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Personal configuration files (users should not commit their actual configs)
+config/my_*.yaml
+config/*_personal.yaml
+
+# Backup files
+*.backup
+*.bak
+
+# Logs
+*.log

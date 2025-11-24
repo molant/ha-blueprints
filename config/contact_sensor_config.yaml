@@ -1,0 +1,291 @@
+# ============================================================================
+# Contact Sensor Hierarchical Configuration
+# ============================================================================
+#
+# This configuration file defines a three-tier hierarchy for contact sensor
+# notifications:
+#
+# 1. ENTITY-SPECIFIC OVERRIDES (Highest Priority)
+#    - Apply to individual sensors
+#    - Override both area and global settings
+#
+# 2. AREA-LEVEL OVERRIDES (Medium Priority)
+#    - Apply to all sensors in a specific area
+#    - Override global settings
+#    - Overridden by entity-specific settings
+#
+# 3. GLOBAL DEFAULTS (Lowest Priority / Fallback)
+#    - Apply to all sensors unless overridden
+#    - Used when no area or entity-specific config exists
+#
+# HIERARCHY RESOLUTION ORDER:
+# Entity-specific → Area-level → Global → Blueprint fallback
+#
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# GLOBAL DEFAULTS
+# ----------------------------------------------------------------------------
+# These settings apply to ALL contact sensors unless overridden by
+# area-level or entity-specific configurations.
+#
+# Properties:
+#   delay_minutes: How long the sensor must be open before alerting
+#   critical: Whether to use critical notifications (iOS bypasses Do Not Disturb)
+# ----------------------------------------------------------------------------
+
+global_defaults:
+  delay_minutes: 10
+  critical: false
+
+
+# ----------------------------------------------------------------------------
+# AREA-LEVEL OVERRIDES
+# ----------------------------------------------------------------------------
+# Define different thresholds and notification types for specific areas
+# in your home. Area names must match exactly with your Home Assistant
+# area names (case-sensitive).
+#
+# Example use cases:
+#   - Shorter delays for security-sensitive areas (entry points)
+#   - Longer delays for frequently accessed areas (garage)
+#   - Critical notifications for outdoor/external doors
+#
+# The area name is determined by Home Assistant's area assignment for
+# each sensor entity.
+# ----------------------------------------------------------------------------
+
+area_overrides:
+  # Entry/Security Areas - Critical and quick alerts
+  "Front Door":
+    delay_minutes: 5
+    critical: true
+
+  "Back Door":
+    delay_minutes: 5
+    critical: true
+
+  # Climate Control - Moderate delays
+  Kitchen:
+    delay_minutes: 10
+    critical: false
+
+  Bedroom:
+    delay_minutes: 15
+    critical: false
+
+  "Living Room":
+    delay_minutes: 15
+    critical: false
+
+  # Less Critical Areas - Longer delays
+  Garage:
+    delay_minutes: 30
+    critical: false
+
+  Basement:
+    delay_minutes: 20
+    critical: false
+
+  # Outdoor/External - Critical notifications
+  Patio:
+    delay_minutes: 10
+    critical: true
+
+  # Climate-sensitive areas (future: could add temperature thresholds)
+  Upstairs:
+    delay_minutes: 12
+    critical: false
+
+  Downstairs:
+    delay_minutes: 12
+    critical: false
+
+
+# ----------------------------------------------------------------------------
+# ENTITY-SPECIFIC OVERRIDES
+# ----------------------------------------------------------------------------
+# Define custom settings for individual sensors. These override both
+# area-level and global defaults.
+#
+# Entity IDs must match exactly with your Home Assistant entity IDs.
+#
+# Example use cases:
+#   - Fridge/freezer doors (very short delays, critical)
+#   - Medicine cabinets (security/safety critical)
+#   - Pet doors (longer delays, less critical)
+#   - Mailbox sensors (moderate delay)
+#   - Safe/valuables (immediate, critical)
+#
+# TIP: Use entity-specific overrides sparingly. Most sensors should
+# inherit from area or global defaults for easier maintenance.
+# ----------------------------------------------------------------------------
+
+entity_overrides:
+  # Appliances - Very short delays, critical
+  binary_sensor.fridge_door:
+    delay_minutes: 2
+    critical: true
+
+  binary_sensor.freezer_door:
+    delay_minutes: 3
+    critical: true
+
+  # Security/Valuables - Immediate alerts
+  binary_sensor.safe_door:
+    delay_minutes: 1
+    critical: true
+
+  binary_sensor.medicine_cabinet:
+    delay_minutes: 5
+    critical: true
+
+  # Utility - Longer acceptable delays
+  binary_sensor.mailbox:
+    delay_minutes: 120  # 2 hours - you might want it open for mail carrier
+    critical: false
+
+  binary_sensor.pet_door:
+    delay_minutes: 30
+    critical: false
+
+  # Windows with specific requirements
+  binary_sensor.bathroom_window:
+    delay_minutes: 20  # Longer delay for ventilation
+    critical: false
+
+  binary_sensor.bedroom_window:
+    delay_minutes: 10
+    critical: false
+
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+#
+# Example 1: Front door sensor
+# -----------------------------
+# Entity: binary_sensor.front_door
+# Area: "Front Door"
+#
+# Resolution:
+# 1. Check entity_overrides → Not found
+# 2. Check area_overrides["Front Door"] → Found!
+#    → delay_minutes: 5, critical: true
+#
+# Result: Alert after 5 minutes with critical notification
+#
+#
+# Example 2: Fridge door sensor
+# ------------------------------
+# Entity: binary_sensor.fridge_door
+# Area: Kitchen
+#
+# Resolution:
+# 1. Check entity_overrides[binary_sensor.fridge_door] → Found!
+#    → delay_minutes: 2, critical: true
+# 2. (Area and global defaults are ignored due to entity-specific match)
+#
+# Result: Alert after 2 minutes with critical notification
+#
+#
+# Example 3: Random window in living room
+# ----------------------------------------
+# Entity: binary_sensor.living_room_window_2
+# Area: "Living Room"
+#
+# Resolution:
+# 1. Check entity_overrides → Not found
+# 2. Check area_overrides["Living Room"] → Found!
+#    → delay_minutes: 15, critical: false
+#
+# Result: Alert after 15 minutes with standard notification
+#
+#
+# Example 4: Sensor in unspecified area
+# --------------------------------------
+# Entity: binary_sensor.random_sensor
+# Area: "Office" (not in area_overrides)
+#
+# Resolution:
+# 1. Check entity_overrides → Not found
+# 2. Check area_overrides["Office"] → Not found
+# 3. Check global_defaults → Found!
+#    → delay_minutes: 10, critical: false
+#
+# Result: Alert after 10 minutes with standard notification
+#
+# ============================================================================
+
+
+# ============================================================================
+# FUTURE ENHANCEMENTS (Architecture Ready)
+# ============================================================================
+#
+# The configuration structure is designed to be extensible. Future versions
+# may support additional properties such as:
+#
+# Temperature-based overrides:
+#   - Allow longer delays if outdoor temp is comfortable
+#   - Different thresholds based on indoor temp
+#
+# Example future config (DO NOT USE YET):
+#
+# entity_overrides:
+#   binary_sensor.bedroom_window:
+#     delay_minutes: 10
+#     critical: false
+#     temperature_rules:
+#       - condition: outdoor_temp_between
+#         min: 65
+#         max: 75
+#         delay_minutes: 30  # Allow window open longer in nice weather
+#       - condition: indoor_temp_above
+#         threshold: 78
+#         delay_minutes: 20  # Allow window open for cooling
+#
+# Time-based overrides:
+#   - Different delays during day vs night
+#   - Vacation mode adjustments
+#
+# Presence-based overrides:
+#   - More aggressive alerts when away
+#   - Relaxed alerts when home
+#
+# ============================================================================
+
+
+# ============================================================================
+# MAINTENANCE TIPS
+# ============================================================================
+#
+# 1. Start with good global defaults
+#    - Most sensors should work well with the global config
+#    - Adjust the global defaults first before adding overrides
+#
+# 2. Use area overrides for logical groupings
+#    - Group similar rooms/spaces
+#    - Consider security zones (entry points, outdoor, etc.)
+#    - Think about climate control zones
+#
+# 3. Reserve entity-specific overrides for special cases
+#    - Appliances with specific requirements
+#    - High-security items
+#    - Sensors with unusual behavior patterns
+#
+# 4. Document your reasoning
+#    - Add comments explaining why you chose specific values
+#    - Note any special circumstances
+#
+# 5. Test your configuration
+#    - After making changes, test a few sensors
+#    - Verify the hierarchy is working as expected
+#    - Check notification timing and criticality
+#
+# 6. Review periodically
+#    - Adjust thresholds based on real-world usage
+#    - Remove overrides that are no longer needed
+#    - Update as you add new sensors or areas
+#
+# ============================================================================

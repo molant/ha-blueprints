@@ -1,0 +1,319 @@
+blueprint:
+  name: Contact Sensor Left Open - Hierarchical Notification
+  description: >
+    Enhanced contact sensor notification with hierarchical configuration system.
+
+    This blueprint supports a three-tier configuration hierarchy:
+    1. Entity-specific overrides (highest priority)
+    2. Area-level defaults (middle priority)
+    3. Global defaults (fallback)
+
+    Features:
+    - Customizable delay thresholds per entity, area, or globally
+    - Standard or critical iOS notifications (bypasses Do Not Disturb)
+    - Auto-clear notifications when sensor closes
+    - Optional repeat notifications
+    - Supports binary_sensor groups
+    - Customizable messages with variables
+    - Additional conditions support
+    - Custom actions on open/close
+
+  domain: automation
+
+  input:
+    # --- Core Sensor Configuration ---
+    contact_sensor:
+      name: Contact Sensor
+      description: The contact sensor or binary_sensor group to monitor
+      selector:
+        entity:
+          domain: binary_sensor
+
+    # --- Hierarchical Configuration ---
+    config_helper:
+      name: Configuration Helper (Input Text)
+      description: >
+        An input_text helper containing your hierarchical configuration in YAML format.
+        This defines global defaults, area overrides, and entity-specific settings.
+        See the example configuration file for the expected format.
+      selector:
+        entity:
+          domain: input_text
+
+    # --- Fallback Global Settings (used if config_helper parsing fails) ---
+    fallback_delay:
+      name: Fallback Delay (minutes)
+      description: Default delay if configuration helper cannot be parsed
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: minutes
+          mode: slider
+
+    fallback_critical:
+      name: Fallback Critical Notification
+      description: Use critical notification as fallback if config parsing fails
+      default: false
+      selector:
+        boolean:
+
+    # --- Notification Settings ---
+    notify_service:
+      name: Notification Service
+      description: The notification service to use (e.g., notify.mobile_app_iphone)
+      selector:
+        text:
+
+    notification_title:
+      name: Notification Title
+      description: "Variables: {{sensor_name}}, {{area}}, {{delay_minutes}}"
+      default: "{{sensor_name}} Left Open"
+      selector:
+        text:
+
+    notification_message:
+      name: Notification Message
+      description: "Variables: {{sensor_name}}, {{area}}, {{delay_minutes}}, {{time_open}}"
+      default: "{{sensor_name}} has been open for {{delay_minutes}} minutes"
+      selector:
+        text:
+
+    # --- Repeat Notifications ---
+    repeat_enabled:
+      name: Enable Repeat Notifications
+      description: Send repeated reminders while sensor remains open
+      default: false
+      selector:
+        boolean:
+
+    repeat_interval:
+      name: Repeat Interval (minutes)
+      description: How often to repeat notifications (only if repeat is enabled)
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: minutes
+          mode: slider
+
+    # --- Additional Conditions ---
+    additional_conditions:
+      name: Additional Conditions
+      description: Extra conditions that must be true (e.g., someone is home)
+      default: []
+      selector:
+        condition:
+
+    # --- Custom Actions ---
+    custom_actions_on_open:
+      name: Custom Actions (On Open Alert)
+      description: Additional actions to run when the open alert triggers
+      default: []
+      selector:
+        action:
+
+    custom_actions_on_close:
+      name: Custom Actions (On Close)
+      description: Additional actions to run when the sensor closes
+      default: []
+      selector:
+        action:
+
+# Define the automation behavior
+mode: restart
+max_exceeded: silent
+
+variables:
+  # Store inputs as variables for easier access
+  contact_sensor: !input contact_sensor
+  config_helper: !input config_helper
+  fallback_delay_input: !input fallback_delay
+  fallback_critical_input: !input fallback_critical
+  notify_service_input: !input notify_service
+  notification_title_input: !input notification_title
+  notification_message_input: !input notification_message
+  repeat_enabled_input: !input repeat_enabled
+  repeat_interval_input: !input repeat_interval
+
+  # Extract sensor information
+  sensor_name: "{{ state_attr(contact_sensor, 'friendly_name') }}"
+  sensor_area: "{{ area_name(contact_sensor) | default('Unknown', true) }}"
+  sensor_entity_id: "{{ contact_sensor }}"
+
+  # Parse the configuration from the helper
+  # The config helper should contain YAML in this format:
+  # global_defaults:
+  #   delay_minutes: 10
+  #   critical: false
+  # area_overrides:
+  #   Kitchen:
+  #     delay_minutes: 5
+  #     critical: true
+  # entity_overrides:
+  #   binary_sensor.fridge_door:
+  #     delay_minutes: 2
+  #     critical: true
+
+  config_yaml: "{{ states(config_helper) }}"
+
+  # Parse YAML configuration (with error handling)
+  # Note: from_yaml filter safely parses YAML or returns empty dict on error
+  parsed_config: >
+    {% set config = config_yaml | from_yaml %}
+    {% if config is mapping %}
+      {{ config }}
+    {% else %}
+      {}
+    {% endif %}
+
+  # Extract configuration sections
+  global_config: "{{ parsed_config.get('global_defaults', {}) }}"
+  area_overrides: "{{ parsed_config.get('area_overrides', {}) }}"
+  entity_overrides: "{{ parsed_config.get('entity_overrides', {}) }}"
+
+  # Determine delay_minutes using hierarchy: entity → area → global → fallback
+  delay_minutes: >
+    {% if sensor_entity_id in entity_overrides %}
+      {# Entity-specific override found #}
+      {{ entity_overrides[sensor_entity_id].get('delay_minutes',
+         area_overrides.get(sensor_area, {}).get('delay_minutes',
+         global_config.get('delay_minutes', fallback_delay_input))) }}
+    {% elif sensor_area in area_overrides %}
+      {# Area-level override found #}
+      {{ area_overrides[sensor_area].get('delay_minutes',
+         global_config.get('delay_minutes', fallback_delay_input)) }}
+    {% elif 'delay_minutes' in global_config %}
+      {# Use global default #}
+      {{ global_config.delay_minutes }}
+    {% else %}
+      {# Use fallback #}
+      {{ fallback_delay_input }}
+    {% endif %}
+
+  # Determine critical notification using same hierarchy
+  is_critical: >
+    {% if sensor_entity_id in entity_overrides %}
+      {{ entity_overrides[sensor_entity_id].get('critical',
+         area_overrides.get(sensor_area, {}).get('critical',
+         global_config.get('critical', fallback_critical_input))) }}
+    {% elif sensor_area in area_overrides %}
+      {{ area_overrides[sensor_area].get('critical',
+         global_config.get('critical', fallback_critical_input)) }}
+    {% elif 'critical' in global_config %}
+      {{ global_config.critical }}
+    {% else %}
+      {{ fallback_critical_input }}
+    {% endif %}
+
+  # Prepare notification data
+  notification_data: >
+    {% set data = namespace(result={}) %}
+    {% if is_critical %}
+      {% set data.result = {'push': {'sound': {'name': 'default', 'critical': 1, 'volume': 1.0}}} %}
+    {% endif %}
+    {{ data.result }}
+
+trigger:
+  - platform: state
+    entity_id: !input contact_sensor
+    to: "on"
+    for:
+      minutes: "{{ delay_minutes | int }}"
+
+  # Trigger on sensor closing to clear notifications
+  - platform: state
+    entity_id: !input contact_sensor
+    to: "off"
+    id: "sensor_closed"
+
+condition:
+  # Check additional conditions (if any)
+  - condition: !input additional_conditions
+
+action:
+  - choose:
+      # --- SENSOR CLOSED: Clear notification and run custom actions ---
+      - conditions:
+          - condition: trigger
+            id: "sensor_closed"
+        sequence:
+          # Clear the notification
+          - service: "{{ notify_service_input }}"
+            data:
+              message: "clear_notification"
+              data:
+                tag: "contact_sensor_{{ sensor_entity_id | replace('.', '_') }}"
+
+          # Run custom close actions
+          - choose: []
+            default: !input custom_actions_on_close
+
+      # --- SENSOR OPEN: Send notification(s) ---
+      default:
+        - variables:
+            # Calculate how long the sensor has been open
+            time_open: >
+              {% set opened_at = states[contact_sensor].last_changed %}
+              {% set duration = now() - opened_at %}
+              {% set hours = duration.total_seconds() // 3600 %}
+              {% set minutes = (duration.total_seconds() % 3600) // 60 %}
+              {% if hours > 0 %}
+                {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+              {% else %}
+                {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+              {% endif %}
+
+        # Send the initial notification
+        - service: "{{ notify_service_input }}"
+          data:
+            title: "{{ notification_title_input }}"
+            message: "{{ notification_message_input }}"
+            data: >
+              {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
+
+        # Run custom open actions
+        - choose: []
+          default: !input custom_actions_on_open
+
+        # Repeat notifications if enabled
+        - if:
+            - condition: template
+              value_template: "{{ repeat_enabled_input }}"
+          then:
+            - repeat:
+                while:
+                  - condition: state
+                    entity_id: !input contact_sensor
+                    state: "on"
+                sequence:
+                  - delay:
+                      minutes: "{{ repeat_interval_input | int }}"
+
+                  # Check if still open before sending repeat notification
+                  - if:
+                      - condition: state
+                        entity_id: !input contact_sensor
+                        state: "on"
+                    then:
+                      - variables:
+                          # Recalculate time open for repeat notification
+                          time_open: >
+                            {% set opened_at = states[contact_sensor].last_changed %}
+                            {% set duration = now() - opened_at %}
+                            {% set hours = duration.total_seconds() // 3600 %}
+                            {% set minutes = (duration.total_seconds() % 3600) // 60 %}
+                            {% if hours > 0 %}
+                              {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+                            {% else %}
+                              {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+                            {% endif %}
+
+                      - service: "{{ notify_service_input }}"
+                        data:
+                          title: "{{ notification_title_input }}"
+                          message: "{{ notification_message_input }}"
+                          data: >
+                            {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
