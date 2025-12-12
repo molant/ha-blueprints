@@ -1,23 +1,15 @@
 blueprint:
   name: Contact Sensor Left Open - Hierarchical Notification
-  description: >
-    Enhanced contact sensor notification with hierarchical configuration system.
+  description: |
+    Smarter left-open alerts with entity, area, floor, and global overrides.
 
-    This blueprint supports a four-tier configuration hierarchy:
-    1. Entity-specific overrides (highest priority)
-    2. Area-level overrides (rooms like Kitchen, Bedroom)
-    3. Floor-level overrides (levels like Upstairs, Downstairs)
-    4. Global defaults (fallback)
-
+    Configuration order: Entity > Area > Floor > Global (fallback).
     Features:
-    - Customizable delay thresholds per entity, area, floor, or globally
-    - Standard or critical iOS notifications (bypasses Do Not Disturb)
-    - Auto-clear notifications when sensor closes
-    - Optional repeat notifications
-    - Supports binary_sensor groups
-    - Customizable messages with variables
-    - Additional conditions support
-    - Custom actions on open/close
+    - Per-entity/area/floor/global delay minutes
+    - Standard or critical iOS notifications (bypass Do Not Disturb)
+    - Auto-clear when closed; optional repeat reminders
+    - Supports binary_sensor groups and extra conditions
+    - Custom messages and actions on open/close
 
   domain: automation
 
@@ -261,9 +253,7 @@ trigger:
     to: "off"
     id: "sensor_closed"
 
-condition:
-  # Check additional conditions (if any)
-  - condition: !input additional_conditions
+condition: !input additional_conditions
 
 action:
   - choose:
@@ -283,69 +273,69 @@ action:
           - choose: []
             default: !input custom_actions_on_close
 
-      # --- SENSOR OPEN: Send notification(s) ---
-      default:
-        - variables:
-            # Calculate how long the sensor has been open
-            time_open: >
-              {% set opened_at = states[contact_sensor].last_changed %}
-              {% set duration = now() - opened_at %}
-              {% set hours = duration.total_seconds() // 3600 %}
-              {% set minutes = (duration.total_seconds() % 3600) // 60 %}
-              {% if hours > 0 %}
-                {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-              {% else %}
-                {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-              {% endif %}
+    # --- SENSOR OPEN: Send notification(s) ---
+    default:
+      - variables:
+          # Calculate how long the sensor has been open
+          time_open: >
+            {% set opened_at = states[contact_sensor].last_changed %}
+            {% set duration = now() - opened_at %}
+            {% set hours = duration.total_seconds() // 3600 %}
+            {% set minutes = (duration.total_seconds() % 3600) // 60 %}
+            {% if hours > 0 %}
+              {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+            {% else %}
+              {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+            {% endif %}
 
-        # Send the initial notification
-        - service: "{{ notify_service_input }}"
-          data:
-            title: "{{ notification_title_input }}"
-            message: "{{ notification_message_input }}"
-            data: >
-              {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
+      # Send the initial notification
+      - service: "{{ notify_service_input }}"
+        data:
+          title: "{{ notification_title_input }}"
+          message: "{{ notification_message_input }}"
+          data: >
+            {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
 
-        # Run custom open actions
-        - choose: []
-          default: !input custom_actions_on_open
+      # Run custom open actions
+      - choose: []
+        default: !input custom_actions_on_open
 
-        # Repeat notifications if enabled
-        - if:
-            - condition: template
-              value_template: "{{ repeat_enabled_input }}"
-          then:
-            - repeat:
-                while:
-                  - condition: state
-                    entity_id: !input contact_sensor
-                    state: "on"
-                sequence:
-                  - delay:
-                      minutes: "{{ repeat_interval_input | int }}"
+      # Repeat notifications if enabled
+      - if:
+          - condition: template
+            value_template: "{{ repeat_enabled_input }}"
+        then:
+          - repeat:
+              while:
+                - condition: state
+                  entity_id: !input contact_sensor
+                  state: "on"
+              sequence:
+                - delay:
+                    minutes: "{{ repeat_interval_input | int }}"
 
-                  # Check if still open before sending repeat notification
-                  - if:
-                      - condition: state
-                        entity_id: !input contact_sensor
-                        state: "on"
-                    then:
-                      - variables:
-                          # Recalculate time open for repeat notification
-                          time_open: >
-                            {% set opened_at = states[contact_sensor].last_changed %}
-                            {% set duration = now() - opened_at %}
-                            {% set hours = duration.total_seconds() // 3600 %}
-                            {% set minutes = (duration.total_seconds() % 3600) // 60 %}
-                            {% if hours > 0 %}
-                              {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-                            {% else %}
-                              {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-                            {% endif %}
+                # Check if still open before sending repeat notification
+                - if:
+                    - condition: state
+                      entity_id: !input contact_sensor
+                      state: "on"
+                  then:
+                    - variables:
+                        # Recalculate time open for repeat notification
+                        time_open: >
+                          {% set opened_at = states[contact_sensor].last_changed %}
+                          {% set duration = now() - opened_at %}
+                          {% set hours = duration.total_seconds() // 3600 %}
+                          {% set minutes = (duration.total_seconds() % 3600) // 60 %}
+                          {% if hours > 0 %}
+                            {{ hours | int }} hour{{ 's' if hours > 1 else '' }} and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+                          {% else %}
+                            {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+                          {% endif %}
 
-                      - service: "{{ notify_service_input }}"
-                        data:
-                          title: "{{ notification_title_input }}"
-                          message: "{{ notification_message_input }}"
-                          data: >
-                            {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
+                    - service: "{{ notify_service_input }}"
+                      data:
+                        title: "{{ notification_title_input }}"
+                        message: "{{ notification_message_input }}"
+                        data: >
+                          {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}

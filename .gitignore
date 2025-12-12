@@ -1,6 +1,7 @@
 # Editor directories and files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -19,3 +20,12 @@ config/*_personal.yaml
 
 # Logs
 *.log
+
+# Node modules
+node_modules/
+
+# Python virtual environment
+venv/
+.venv/
+env/
+__pycache__/

@@ -31,7 +31,7 @@ Click the badge below to import the blueprint into your Home Assistant instance:
 Or manually import via:
 1. Navigate to **Settings** → **Automations & Scenes** → **Blueprints**
 2. Click **Import Blueprint**
-3. Enter the URL: `https://github.com/YOUR_USERNAME/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml`
+3. Enter the URL: `https://github.com/molant/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml`
 
 ### Step 2: Create the Configuration Helper
 
@@ -563,16 +563,27 @@ Periodically review your configuration:
 
 ---
 
-## Future Enhancements
+## Development
 
-The configuration structure is designed to be extensible. Planned features include:
+If you want to contribute or create your own blueprints, see [DEVELOPMENT.md](DEVELOPMENT.md) for:
+- Setting up linting and validation (Python-based)
+- Blueprint development guidelines
+- Testing procedures
+- Git workflow
 
-- **Temperature-based thresholds**: Different delays based on indoor/outdoor temperature
-- **Time-based overrides**: Different settings for day vs night
-- **Presence-based adjustments**: More aggressive alerts when away
-- **Seasonal adjustments**: Longer delays for windows during pleasant weather
+### Quick Start for Contributors
 
-The current architecture is ready to support these features when implemented.
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Validate your changes
+python scripts/validate.py
+
+# Or run specific checks:
+python scripts/validate.py lint      # YAML linting only
+python scripts/validate.py validate  # Blueprint validation only
+```
 
 ---
 

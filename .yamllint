@@ -1,0 +1,42 @@
+extends: default
+
+rules:
+  line-length:
+    max: 120
+    level: warning
+
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  comments:
+    min-spaces-from-content: 1
+
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+
+  document-start:
+    present: false
+
+  brackets:
+    max-spaces-inside: 0
+
+  braces:
+    max-spaces-inside: 0
+
+  empty-lines:
+    max: 2
+
+  trailing-spaces: enable
+
+  key-duplicates: enable
+
+  new-line-at-end-of-file: enable
+
+  new-lines:
+    type: unix
+
+ignore: |
+  .git/
+  node_modules/
+  venv/
