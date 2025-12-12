@@ -26,7 +26,7 @@ An enhanced contact sensor notification blueprint that uses a four-tier configur
 
 Click the badge below to import the blueprint into your Home Assistant instance:
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/YOUR_USERNAME/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/molant/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml)
 
 Or manually import via:
 1. Navigate to **Settings** → **Automations & Scenes** → **Blueprints**
