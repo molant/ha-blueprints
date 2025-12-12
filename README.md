@@ -1,26 +1,142 @@
 # Home Assistant Blueprints
 
-A collection of advanced Home Assistant blueprints with hierarchical configuration support.
+A collection of advanced Home Assistant blueprints and packages with hierarchical configuration support for contact sensor monitoring.
 
-## Blueprints
+---
 
-### 📢 Contact Sensor Left Open - Hierarchical Notification
+## 📢 Contact Sensor Monitoring - Choose Your Approach
 
-An enhanced contact sensor notification blueprint that uses a four-tier configuration hierarchy to provide flexible, per-sensor alert thresholds and notification priorities.
+Get smart notifications when doors, windows, or other contact sensors are left open too long. Configure different delays and alert priorities using a four-tier hierarchy: **Entity → Area → Floor → Global**.
 
-**Key Features:**
+### **Key Features:**
 - 🎯 **Four-tier hierarchy**: Entity-specific → Area-level → Floor-level → Global defaults
 - 🚨 **Critical iOS notifications**: Bypass Do Not Disturb mode for important alerts
 - 🔄 **Auto-clear notifications**: Automatically dismiss when sensor closes
 - 🔁 **Repeat alerts**: Optional recurring notifications while sensor remains open
-- 👥 **Binary sensor group support**: Monitor multiple sensors as one
 - 🎨 **Customizable messages**: Use variables like sensor name, area, time open
 - ⚙️ **Additional conditions**: Only alert when home, during specific hours, etc.
 - 🎬 **Custom actions**: Trigger additional automations on open/close events
 
 ---
 
-## Installation
+## 🎯 Which Approach Should I Use?
+
+### Option 1: **Blueprint - Global (All Sensors)** ⭐ RECOMMENDED
+
+**Best for:** Most users who want simplicity with visual configuration.
+
+✅ **One automation monitors ALL sensors automatically**
+✅ **Visual UI configuration** (no YAML editing!)
+✅ **New sensors work immediately** (no setup needed)
+✅ **Easy to share** (import button)
+✅ **Scales perfectly** (10 sensors or 100 sensors, same setup)
+
+⚠️ **Global settings only** - all sensors use the same delay
+
+**[Click to Import Blueprint](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/molant/ha-blueprints/blob/main/blueprints/contact_sensor_global_notification.yaml)**
+
+---
+
+### Option 2: **Blueprint - Hierarchical (Per Sensor)**
+
+**Best for:** Users who need different delays for different sensors/areas/floors.
+
+✅ **Hierarchical configuration** (Entity → Area → Floor → Global)
+✅ **Per-sensor customization** (fridge 2min, doors 5min, windows 10min)
+✅ **Visual configuration** (point-and-click setup)
+
+⚠️ **One automation needed per sensor**
+⚠️ New sensors require manual setup
+⚠️ Requires YAML configuration file for hierarchy
+
+**[Click to Import Blueprint](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/molant/ha-blueprints/blob/main/blueprints/contact_sensor_hierarchical_notification.yaml)**
+
+---
+
+### Option 3: **Package (Auto-Monitor All Sensors)**
+
+**Best for:** Advanced users comfortable with YAML who want ultimate control.
+
+✅ **One automation monitors ALL sensors automatically**
+✅ **No blueprint needed** (standalone package)
+✅ **Easy to customize** (edit YAML directly)
+
+⚠️ Requires editing YAML files
+⚠️ Global settings only (via input helpers)
+
+**[📖 Package Installation](INSTALLATION.md)** | **[📦 Package File](packages/contact_sensor_auto_monitor.yaml)**
+
+---
+
+## Quick Comparison
+
+| Feature | Blueprint - Global | Blueprint - Hierarchical | Package |
+|---------|-------------------|-------------------------|---------|
+| **Automations needed** | 1 for all sensors | 1 per sensor | 1 for all sensors |
+| **New sensors** | Auto-detected ✅ | Manual setup | Auto-detected ✅ |
+| **Configuration UI** | Visual ✅ | Visual + YAML | Edit YAML |
+| **Per-sensor delays** | No (global only) | Yes ✅ (hierarchical) | No (global only) |
+| **Easy to share** | Import button ✅ | Import button ✅ | Copy files |
+| **Setup complexity** | Very Simple ✅ | Moderate | Moderate |
+| **Recommended for** | Most users ⭐ | Custom config needs | YAML enthusiasts |
+
+---
+
+## Installation (Blueprint - Global)
+
+### Quick Setup (5 Minutes)
+
+1. **Import the blueprint** - Click the badge:
+
+   [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/molant/ha-blueprints/blob/main/blueprints/contact_sensor_global_notification.yaml)
+
+2. **Create automation** from blueprint:
+   - Go to **Settings → Automations → Create Automation → Use Blueprint**
+   - Select **"Contact Sensor Left Open - Global Notification (All Sensors)"**
+
+3. **Configure settings:**
+   - **Delay**: How long before alerting (default: 10 minutes)
+   - **Notification Service**: Your service (e.g., `notify.mobile_app_iphone`)
+   - **Critical Notification**: Toggle ON for iOS critical alerts (optional)
+
+4. **Save!**
+
+Done! All contact sensors are now monitored with one automation.
+
+---
+
+## Installation (Package Approach)
+
+**See the complete installation guide:** **[INSTALLATION.md](INSTALLATION.md)**
+
+### Quick Start
+
+1. **Enable packages** in `configuration.yaml`:
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named packages
+   ```
+
+2. **Download the package file** to `/config/packages/contact_sensor_auto_monitor.yaml`
+
+3. **Edit the notification service** in the package file:
+   ```yaml
+   notify_service: "notify.mobile_app_your_phone"  # Change this!
+   ```
+
+4. **Reload** configuration (Developer Tools → YAML → Reload All)
+
+5. **Adjust settings** via UI (Settings → Helpers):
+   - **Contact Sensor Delay (Minutes)**: How long before alerting (default: 10)
+   - **Contact Sensor Critical Alert**: Toggle ON for iOS critical alerts
+
+Done! All contact sensors are now monitored automatically with global settings.
+
+**[📖 Full Installation Guide](INSTALLATION.md)** with troubleshooting, examples, and customization options.
+
+---
+
+## Installation (Blueprint Approach)
 
 ### Step 1: Import the Blueprint
 
