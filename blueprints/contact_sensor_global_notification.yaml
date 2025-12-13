@@ -38,11 +38,15 @@ blueprint:
         boolean:
 
     # --- Notification Settings ---
-    notify_service:
-      name: Notification Service
-      description: The notification service to use (e.g., notify.mobile_app_iphone)
+    notify_devices:
+      name: Devices to Notify
+      description: Select the mobile devices to receive notifications
+      default: []
       selector:
-        text:
+        device:
+          filter:
+            - integration: mobile_app
+          multiple: true
 
     notification_title:
       name: Notification Title
@@ -109,7 +113,7 @@ variables:
   # Store inputs as variables
   delay_minutes_input: !input delay_minutes
   critical_input: !input critical_notification
-  notify_service_input: !input notify_service
+  notify_devices_input: !input notify_devices
   notification_title_input: !input notification_title
   notification_message_input: !input notification_message
   repeat_enabled_input: !input repeat_enabled
@@ -155,12 +159,15 @@ action:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'off' }}"
         sequence:
-          # Clear the notification
-          - service: "{{ notify_service_input }}"
-            data:
-              message: "clear_notification"
-              data:
-                tag: "contact_sensor_{{ sensor_entity_id | replace('.', '_') }}"
+          # Clear the notification on all devices
+          - repeat:
+              for_each: "{{ notify_devices_input }}"
+              sequence:
+                - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
+                  data:
+                    message: "clear_notification"
+                    data:
+                      tag: "contact_sensor_{{ sensor_entity_id | replace('.', '_') }}"
 
           # Run custom close actions
           - choose: []
@@ -191,13 +198,16 @@ action:
               {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
             {% endif %}
 
-      # Send the initial notification
-      - service: "{{ notify_service_input }}"
-        data:
-          title: "{{ notification_title_input }}"
-          message: "{{ notification_message_input }}"
-          data: >
-            {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
+      # Send the initial notification to all devices
+      - repeat:
+          for_each: "{{ notify_devices_input }}"
+          sequence:
+            - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
+              data:
+                title: "{{ notification_title_input }}"
+                message: "{{ notification_message_input }}"
+                data: >
+                  {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
 
       # Run custom open actions
       - choose: []
@@ -235,9 +245,13 @@ action:
                             {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
                           {% endif %}
 
-                    - service: "{{ notify_service_input }}"
-                      data:
-                        title: "{{ notification_title_input }}"
-                        message: "{{ notification_message_input }}"
-                        data: >
-                          {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
+                    # Send repeat notification to all devices
+                    - repeat:
+                        for_each: "{{ notify_devices_input }}"
+                        sequence:
+                          - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
+                            data:
+                              title: "{{ notification_title_input }}"
+                              message: "{{ notification_message_input }}"
+                              data: >
+                                {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
