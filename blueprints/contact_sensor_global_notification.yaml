@@ -121,29 +121,39 @@ variables:
 
 trigger:
   # Trigger on ANY binary_sensor state change
-  - platform: state
-    entity_id: binary_sensor
-    to:
-      - "on"
-      - "off"
+  - platform: event
+    event_type: state_changed
 
 condition:
   - and:
+      # Only proceed if this is a binary_sensor entity
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.entity_id is defined
+             and trigger.event.data.entity_id.startswith('binary_sensor.') }}
+
       # Only proceed if this is a contact sensor
       - condition: template
         value_template: >
-          {% set device_class = state_attr(trigger.entity_id, 'device_class') %}
+          {% set device_class = state_attr(trigger.event.data.entity_id, 'device_class') %}
           {{ device_class in ['door', 'window', 'opening', 'garage_door'] }}
+
+      # Only proceed if state changed to on or off
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.new_state is not none
+             and trigger.event.data.new_state.state in ['on', 'off'] }}
 
       # Additional user-defined conditions
       - condition: !input additional_conditions
 
 action:
   - variables:
-      # Extract sensor information
-      sensor_name: "{{ state_attr(trigger.entity_id, 'friendly_name') }}"
-      area: "{{ area_name(trigger.entity_id) | default('Unknown', true) }}"
-      sensor_entity_id: "{{ trigger.entity_id }}"
+      # Extract sensor information from event
+      sensor_entity_id: "{{ trigger.event.data.entity_id }}"
+      sensor_name: "{{ state_attr(sensor_entity_id, 'friendly_name') }}"
+      area: "{{ area_name(sensor_entity_id) | default('Unknown', true) }}"
+      new_state: "{{ trigger.event.data.new_state.state }}"
 
       # Prepare notification data
       notification_data: >
@@ -157,7 +167,7 @@ action:
       # --- SENSOR CLOSED: Clear notification and run custom actions ---
       - conditions:
           - condition: template
-            value_template: "{{ trigger.to_state.state == 'off' }}"
+            value_template: "{{ new_state == 'off' }}"
         sequence:
           # Clear the notification on all devices
           - repeat:
