@@ -1,15 +1,14 @@
 blueprint:
-  name: Contact Sensor Left Open - Global Notification (All Sensors)
+  name: Contact Sensor Left Open - Global Notification
   description: |
-    Monitor ALL contact sensors with a single automation.
+    Monitor multiple contact sensors with a single automation.
 
-    This blueprint creates one automation that monitors all doors, windows,
-    garage doors, and other contact sensors in your home. When any sensor
-    is left open too long, you get a notification.
+    Select all the contact sensors you want to monitor. When any sensor
+    is left open too long, you get a notification on your selected devices.
 
     Features:
-    - Monitors ALL contact sensors automatically
-    - New sensors work immediately (no configuration needed)
+    - One automation for multiple sensors
+    - Select devices from dropdown (no typing!)
     - Auto-clear when sensor closes
     - Optional critical iOS notifications
     - Optional repeat reminders
@@ -18,6 +17,20 @@ blueprint:
   domain: automation
 
   input:
+    # --- Sensor Selection ---
+    contact_sensors:
+      name: Contact Sensors
+      description: Select all contact sensors to monitor (doors, windows, etc.)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class:
+            - door
+            - window
+            - opening
+            - garage_door
+          multiple: true
+
     # --- Global Settings ---
     delay_minutes:
       name: Delay (minutes)
@@ -120,40 +133,21 @@ variables:
   repeat_interval_input: !input repeat_interval
 
 trigger:
-  # Trigger on ANY binary_sensor state change
-  - platform: event
-    event_type: state_changed
+  # Trigger on state changes of selected contact sensors
+  - platform: state
+    entity_id: !input contact_sensors
+    to:
+      - "on"
+      - "off"
 
-condition:
-  - and:
-      # Only proceed if this is a binary_sensor entity
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.entity_id is defined
-             and trigger.event.data.entity_id.startswith('binary_sensor.') }}
-
-      # Only proceed if this is a contact sensor
-      - condition: template
-        value_template: >
-          {% set device_class = state_attr(trigger.event.data.entity_id, 'device_class') %}
-          {{ device_class in ['door', 'window', 'opening', 'garage_door'] }}
-
-      # Only proceed if state changed to on or off
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.new_state is not none
-             and trigger.event.data.new_state.state in ['on', 'off'] }}
-
-      # Additional user-defined conditions
-      - condition: !input additional_conditions
+condition: !input additional_conditions
 
 action:
   - variables:
-      # Extract sensor information from event
-      sensor_entity_id: "{{ trigger.event.data.entity_id }}"
-      sensor_name: "{{ state_attr(sensor_entity_id, 'friendly_name') }}"
-      area: "{{ area_name(sensor_entity_id) | default('Unknown', true) }}"
-      new_state: "{{ trigger.event.data.new_state.state }}"
+      # Extract sensor information
+      sensor_entity_id: "{{ trigger.entity_id }}"
+      sensor_name: "{{ state_attr(trigger.entity_id, 'friendly_name') }}"
+      area: "{{ area_name(trigger.entity_id) | default('Unknown', true) }}"
 
       # Prepare notification data
       notification_data: >
@@ -167,7 +161,7 @@ action:
       # --- SENSOR CLOSED: Clear notification and run custom actions ---
       - conditions:
           - condition: template
-            value_template: "{{ new_state == 'off' }}"
+            value_template: "{{ trigger.to_state.state == 'off' }}"
         sequence:
           # Clear the notification on all devices
           - repeat:
@@ -190,8 +184,9 @@ action:
           minutes: "{{ delay_minutes_input | int }}"
 
       # Check if still open after delay
-      - condition: template
-        value_template: "{{ is_state(sensor_entity_id, 'on') }}"
+      - condition: state
+        entity_id: "{{ sensor_entity_id }}"
+        state: "on"
 
       - variables:
           # Calculate how long the sensor has been open
@@ -230,8 +225,9 @@ action:
         then:
           - repeat:
               while:
-                - condition: template
-                  value_template: "{{ is_state(sensor_entity_id, 'on') }}"
+                - condition: state
+                  entity_id: !input contact_sensors
+                  state: "on"
               sequence:
                 - delay:
                     minutes: "{{ repeat_interval_input | int }}"
