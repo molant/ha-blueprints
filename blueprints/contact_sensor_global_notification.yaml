@@ -184,9 +184,8 @@ action:
           minutes: "{{ delay_minutes_input | int }}"
 
       # Check if still open after delay
-      - condition: state
-        entity_id: "{{ sensor_entity_id }}"
-        state: "on"
+      - condition: template
+        value_template: "{{ is_state(sensor_entity_id, 'on') }}"
 
       - variables:
           # Calculate how long the sensor has been open
