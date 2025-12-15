@@ -207,8 +207,17 @@ action:
           sequence:
             - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
               data:
-                title: "{{ notification_title_input }}"
-                message: "{{ notification_message_input }}"
+                title: >
+                  {% set template = notification_title_input %}
+                  {{ template.replace('{{sensor_name}}', sensor_name)
+                             .replace('{{area}}', area)
+                             .replace('{{delay_minutes}}', delay_minutes | string) }}
+                message: >
+                  {% set template = notification_message_input %}
+                  {{ template.replace('{{sensor_name}}', sensor_name)
+                             .replace('{{area}}', area)
+                             .replace('{{delay_minutes}}', delay_minutes | string)
+                             .replace('{{time_open}}', time_open) }}
                 data: >
                   {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
 
@@ -255,7 +264,16 @@ action:
                         sequence:
                           - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
                             data:
-                              title: "{{ notification_title_input }}"
-                              message: "{{ notification_message_input }}"
+                              title: >
+                                {% set template = notification_title_input %}
+                                {{ template.replace('{{sensor_name}}', sensor_name)
+                                           .replace('{{area}}', area)
+                                           .replace('{{delay_minutes}}', delay_minutes | string) }}
+                              message: >
+                                {% set template = notification_message_input %}
+                                {{ template.replace('{{sensor_name}}', sensor_name)
+                                           .replace('{{area}}', area)
+                                           .replace('{{delay_minutes}}', delay_minutes | string)
+                                           .replace('{{time_open}}', time_open) }}
                               data: >
                                 {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
