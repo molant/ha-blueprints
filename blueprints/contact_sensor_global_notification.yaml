@@ -41,7 +41,7 @@ blueprint:
           min: 1
           max: 1440
           unit_of_measurement: minutes
-          mode: slider
+          mode: box
 
     critical_notification:
       name: Critical Notification (iOS)
@@ -92,7 +92,7 @@ blueprint:
           min: 1
           max: 1440
           unit_of_measurement: minutes
-          mode: slider
+          mode: box
 
     # --- Additional Conditions ---
     additional_conditions:
@@ -133,12 +133,18 @@ variables:
   repeat_interval_input: !input repeat_interval
 
 trigger:
-  # Trigger on state changes of selected contact sensors
+  # Trigger when sensor opens and stays open for the configured delay
   - platform: state
     entity_id: !input contact_sensors
-    to:
-      - "on"
-      - "off"
+    to: "on"
+    for:
+      minutes: !input delay_minutes
+
+  # Also trigger when sensor closes (to clear notifications)
+  - platform: state
+    entity_id: !input contact_sensors
+    to: "off"
+    id: sensor_closed
 
 condition: !input additional_conditions
 
@@ -160,8 +166,8 @@ action:
   - choose:
       # --- SENSOR CLOSED: Clear notification and run custom actions ---
       - conditions:
-          - condition: template
-            value_template: "{{ trigger.to_state.state == 'off' }}"
+          - condition: trigger
+            id: sensor_closed
         sequence:
           # Clear the notification on all devices
           - repeat:
@@ -179,14 +185,7 @@ action:
 
     # --- SENSOR OPEN: Send notification(s) ---
     default:
-      # Wait for the configured delay
-      - delay:
-          minutes: "{{ delay_minutes_input | int }}"
-
-      # Check if still open after delay
-      - condition: template
-        value_template: "{{ is_state(sensor_entity_id, 'on') }}"
-
+      # Sensor has been open for the configured delay (handled by trigger)
       - variables:
           # Calculate how long the sensor has been open
           delay_minutes: "{{ delay_minutes_input }}"
