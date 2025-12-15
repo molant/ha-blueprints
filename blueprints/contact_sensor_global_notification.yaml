@@ -127,8 +127,6 @@ variables:
   delay_minutes_input: !input delay_minutes
   critical_input: !input critical_notification
   notify_devices_input: !input notify_devices
-  notification_title_input: !input notification_title
-  notification_message_input: !input notification_message
   repeat_enabled_input: !input repeat_enabled
   repeat_interval_input: !input repeat_interval
 
@@ -200,6 +198,8 @@ action:
             {% else %}
               {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
             {% endif %}
+          notification_title_template: !input notification_title
+          notification_message_template: !input notification_message
 
       # Send the initial notification to all devices
       - repeat:
@@ -207,17 +207,8 @@ action:
           sequence:
             - service: notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}
               data:
-                title: >
-                  {% set template = notification_title_input %}
-                  {{ template.replace('{{sensor_name}}', sensor_name)
-                             .replace('{{area}}', area)
-                             .replace('{{delay_minutes}}', delay_minutes | string) }}
-                message: >
-                  {% set template = notification_message_input %}
-                  {{ template.replace('{{sensor_name}}', sensor_name)
-                             .replace('{{area}}', area)
-                             .replace('{{delay_minutes}}', delay_minutes | string)
-                             .replace('{{time_open}}', time_open) }}
+                title: "{{ notification_title_template }}"
+                message: "{{ notification_message_template }}"
                 data: >
                   {{ dict(notification_data, **{'tag': 'contact_sensor_' + (sensor_entity_id | replace('.', '_'))}) }}
 
@@ -254,9 +245,9 @@ action:
                           {% if hours > 0 %}
                             {{ hours | int }} hour{{ 's' if hours > 1 else '' }}
                             and {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-                          {% else %}
-                            {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
-                          {% endif %}
+                            {% else %}
+                              {{ minutes | int }} minute{{ 's' if minutes != 1 else '' }}
+                            {% endif %}
 
                     # Send repeat notification to all devices
                     - repeat:
